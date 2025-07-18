@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    
+    <!-- Widget Colors -->
+    <color name="primary_color">#2196F3</color>
+    <color name="accent_color">#FF9800</color>
+    <color name="success_color">#4CAF50</color>
+    <color name="error_color">#F44336</color>
+    
+    <!-- Text Colors -->
+    <color name="text_primary">#212121</color>
+    <color name="text_secondary">#757575</color>
+    
+    <!-- Background Colors -->
+    <color name="background_light">#FAFAFA</color>
+    <color name="card_background">#FFFFFF</color>
+    <color name="progress_background">#E0E0E0</color>
+    
+</resources>
