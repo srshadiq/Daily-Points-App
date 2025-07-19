@@ -23,6 +23,10 @@ public class MainActivity extends AppCompatActivity implements
 
         initializeViews();
         setupViewPager();
+        
+        // Process end-of-day penalties for previous days
+        DatabaseHelper dbHelper = new DatabaseHelper(this);
+        dbHelper.autoProcessPreviousDays();
     }
 
     private void initializeViews() {

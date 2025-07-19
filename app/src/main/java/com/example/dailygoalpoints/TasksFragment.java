@@ -6,10 +6,12 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -21,6 +23,8 @@ import java.util.List;
 public class TasksFragment extends Fragment {
 
     private TextView tvDailyGoalTarget, tvGoalDescription;
+    private TextView tvCurrentPoints, tvDailyTarget, tvProgressMessage;
+    private ProgressBar progressDailyGoal;
     private MaterialButton btnEditGoal, btnAddTask;
     private RecyclerView rvTasks;
     private LinearLayout layoutEmptyState;
@@ -57,6 +61,10 @@ public class TasksFragment extends Fragment {
     private void initializeViews(View view) {
         tvDailyGoalTarget = view.findViewById(R.id.tv_daily_goal_target);
         tvGoalDescription = view.findViewById(R.id.tv_goal_description);
+        tvCurrentPoints = view.findViewById(R.id.tv_current_points);
+        tvDailyTarget = view.findViewById(R.id.tv_daily_target);
+        tvProgressMessage = view.findViewById(R.id.tv_progress_message);
+        progressDailyGoal = view.findViewById(R.id.progress_daily_goal);
         btnEditGoal = view.findViewById(R.id.btn_edit_goal);
         btnAddTask = view.findViewById(R.id.btn_add_task);
         rvTasks = view.findViewById(R.id.rv_tasks);
@@ -99,7 +107,32 @@ public class TasksFragment extends Fragment {
         if (currentGoal != null) {
             tvDailyGoalTarget.setText(String.valueOf(currentGoal.getDailyTarget()));
             tvGoalDescription.setText(currentGoal.getDescription());
+            tvDailyTarget.setText(String.valueOf(currentGoal.getDailyTarget()));
         }
+
+        // Load current points and update progress
+        int currentPoints = databaseHelper.getTodayPoints();
+        tvCurrentPoints.setText(String.valueOf(currentPoints));
+        
+        // Style negative current points differently
+        if (currentPoints < 0) {
+            tvCurrentPoints.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.holo_red_dark));
+        } else {
+            tvCurrentPoints.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.black));
+        }
+
+        // Update progress bar
+        int dailyTarget = databaseHelper.getDailyTarget();
+        int progressPercentage;
+        if (currentPoints < 0) {
+            progressPercentage = 0; // Don't show negative progress
+        } else {
+            progressPercentage = Math.min(100, (currentPoints * 100) / dailyTarget);
+        }
+        progressDailyGoal.setProgress(progressPercentage);
+
+        // Update progress message
+        updateProgressMessage(currentPoints, dailyTarget);
 
         // Load tasks
         List<Task> tasks = databaseHelper.getAllActiveTasks();
@@ -115,6 +148,24 @@ public class TasksFragment extends Fragment {
         }
     }
 
+    private void updateProgressMessage(int currentPoints, int dailyTarget) {
+        String message;
+        if (currentPoints < 0) {
+            message = "⚠️ Negative points! Complete tasks to recover!";
+        } else if (currentPoints >= dailyTarget) {
+            message = "🎉 Amazing! Goal achieved for today!";
+        } else if (currentPoints >= dailyTarget * 0.8) {
+            message = "🔥 Almost there! Keep pushing!";
+        } else if (currentPoints >= dailyTarget * 0.5) {
+            message = "💪 Great progress! You're halfway there!";
+        } else if (currentPoints > 0) {
+            message = "🚀 Good start! Keep going!";
+        } else {
+            message = "⭐ Ready to start your day? Let's go!";
+        }
+        tvProgressMessage.setText(message);
+    }
+
     private void showAddTaskDialog() {
         AddTaskDialog dialog = new AddTaskDialog(getContext(), task -> {
             databaseHelper.addTask(task);
@@ -126,7 +177,8 @@ public class TasksFragment extends Fragment {
 
     private void showEditTaskDialog(Task task) {
         EditTaskDialog dialog = new EditTaskDialog(getContext(), task, updatedTask -> {
-            // Update task in database (you'll need to add an updateTask method to DatabaseHelper)
+            // Update task in database
+            databaseHelper.updateTask(updatedTask);
             loadData();
             notifyDataChange();
         });

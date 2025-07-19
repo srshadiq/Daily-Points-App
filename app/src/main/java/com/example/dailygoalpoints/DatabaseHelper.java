@@ -13,13 +13,14 @@ import java.util.Locale;
 
 public class DatabaseHelper extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "daily_points.db";
-    private static final int DATABASE_VERSION = 3; // Updated version for new columns
+    private static final int DATABASE_VERSION = 4; // Updated version for app settings
 
     // Table names
     private static final String TABLE_DAILY_POINTS = "daily_points";
     private static final String TABLE_TASKS = "tasks";
     private static final String TABLE_GOALS = "goals";
     private static final String TABLE_TASK_COMPLETIONS = "task_completions";
+    private static final String TABLE_APP_SETTINGS = "app_settings";
 
     // Column names for daily_points
     private static final String COLUMN_ID = "id";
@@ -50,6 +51,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     private static final String COMPLETION_TASK_ID = "completion_task_id";
     private static final String COMPLETION_DATE = "completion_date";
     private static final String COMPLETION_STATUS = "completion_status"; // 1 for completed, 0 for missed
+
+    // Column names for app_settings
+    private static final String SETTING_ID = "setting_id";
+    private static final String SETTING_KEY = "setting_key";
+    private static final String SETTING_VALUE = "setting_value";
 
     public DatabaseHelper(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
@@ -103,8 +109,17 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 + ")";
         db.execSQL(CREATE_COMPLETIONS_TABLE);
 
-        // Insert default goal
+        // Create app_settings table
+        String CREATE_SETTINGS_TABLE = "CREATE TABLE " + TABLE_APP_SETTINGS + "("
+                + SETTING_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
+                + SETTING_KEY + " TEXT NOT NULL UNIQUE,"
+                + SETTING_VALUE + " TEXT NOT NULL"
+                + ")";
+        db.execSQL(CREATE_SETTINGS_TABLE);
+
+        // Insert default goal and app start date
         insertDefaultGoal(db);
+        setAppStartDate(db);
     }
 
     @Override
@@ -159,6 +174,19 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 // Columns might already exist, ignore
             }
         }
+
+        if (oldVersion < 4) {
+            // Create app_settings table
+            String CREATE_SETTINGS_TABLE = "CREATE TABLE " + TABLE_APP_SETTINGS + "("
+                    + SETTING_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
+                    + SETTING_KEY + " TEXT NOT NULL UNIQUE,"
+                    + SETTING_VALUE + " TEXT NOT NULL"
+                    + ")";
+            db.execSQL(CREATE_SETTINGS_TABLE);
+            
+            // Set app start date
+            setAppStartDate(db);
+        }
     }
 
     private void insertDefaultGoal(SQLiteDatabase db) {
@@ -169,6 +197,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         values.put(GOAL_START_DATE, getCurrentDate());
         values.put(GOAL_IS_ACTIVE, 1);
         db.insert(TABLE_GOALS, null, values);
+    }
+
+    private void setAppStartDate(SQLiteDatabase db) {
+        ContentValues values = new ContentValues();
+        values.put(SETTING_KEY, "app_start_date");
+        values.put(SETTING_VALUE, getCurrentDate());
+        db.insertWithOnConflict(TABLE_APP_SETTINGS, null, values, SQLiteDatabase.CONFLICT_IGNORE);
     }
 
     // Add a point to today's total
@@ -202,9 +237,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         
         ContentValues values = new ContentValues();
         values.put(COLUMN_DATE, today);
-        values.put("manual_points", Math.max(0, currentManualPoints - 1)); // Don't go below 0
+        values.put("manual_points", currentManualPoints - 1); // Allow negative points
         values.put("task_points", currentTaskPoints);
-        values.put(COLUMN_POINTS, Math.max(0, currentManualPoints - 1) + currentTaskPoints);
+        values.put(COLUMN_POINTS, (currentManualPoints - 1) + currentTaskPoints);
 
         db.insertWithOnConflict(TABLE_DAILY_POINTS, null, values, SQLiteDatabase.CONFLICT_REPLACE);
     }
@@ -321,25 +356,73 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         return sdf.format(new Date());
     }
 
+    // ==== APP SETTINGS METHODS ====
+
+    // Get app setting value
+    public String getAppSetting(String key) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.query(TABLE_APP_SETTINGS, new String[]{SETTING_VALUE},
+                SETTING_KEY + "=?", new String[]{key}, null, null, null);
+        
+        String value = null;
+        if (cursor.moveToFirst()) {
+            value = cursor.getString(0);
+        }
+        cursor.close();
+        return value;
+    }
+
+    // Set app setting value
+    public void setAppSetting(String key, String value) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put(SETTING_KEY, key);
+        values.put(SETTING_VALUE, value);
+        db.insertWithOnConflict(TABLE_APP_SETTINGS, null, values, SQLiteDatabase.CONFLICT_REPLACE);
+    }
+
+    // Get app start date
+    public String getAppStartDate() {
+        String startDate = getAppSetting("app_start_date");
+        return startDate != null ? startDate : getCurrentDate(); // Fallback to today if not set
+    }
+
+    // Check if a date is on or after the app start date
+    public boolean isDateOnOrAfterAppStart(String date) {
+        String appStartDate = getAppStartDate();
+        return date.compareTo(appStartDate) >= 0;
+    }
+
     // ==== TASK MANAGEMENT METHODS ====
 
     // Add a new task
     public long addTask(Task task) {
         SQLiteDatabase db = this.getWritableDatabase();
-        try {
-            ContentValues values = new ContentValues();
-            values.put(TASK_TITLE, task.getTitle());
-            values.put(TASK_DESCRIPTION, task.getDescription());
-            values.put(TASK_POINTS, task.getPoints());
-            values.put(TASK_CATEGORY, task.getCategory());
-            values.put(TASK_PRIORITY, task.getPriority());
-            values.put(TASK_CREATED_DATE, getCurrentDate());
-            values.put(TASK_IS_ACTIVE, 1);
+        ContentValues values = new ContentValues();
+        values.put(TASK_TITLE, task.getTitle());
+        values.put(TASK_DESCRIPTION, task.getDescription());
+        values.put(TASK_POINTS, task.getPoints());
+        values.put(TASK_CATEGORY, task.getCategory());
+        values.put(TASK_PRIORITY, task.getPriority());
+        values.put(TASK_CREATED_DATE, getCurrentDate());
+        values.put(TASK_IS_ACTIVE, 1);
 
-            return db.insert(TABLE_TASKS, null, values);
-        } finally {
-            db.close();
-        }
+        return db.insert(TABLE_TASKS, null, values);
+    }
+
+    // Update an existing task
+    public int updateTask(Task task) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put(TASK_TITLE, task.getTitle());
+        values.put(TASK_DESCRIPTION, task.getDescription());
+        values.put(TASK_POINTS, task.getPoints());
+        values.put(TASK_CATEGORY, task.getCategory());
+        values.put(TASK_PRIORITY, task.getPriority());
+        // Don't update created_date or is_active when updating
+
+        return db.update(TABLE_TASKS, values, TASK_ID + "=?", 
+                new String[]{String.valueOf(task.getId())});
     }
 
     // Get all active tasks
@@ -347,32 +430,28 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         List<Task> taskList = new ArrayList<>();
         SQLiteDatabase db = this.getReadableDatabase();
 
-        try {
-            Cursor cursor = db.query(TABLE_TASKS, null, 
-                    TASK_IS_ACTIVE + "=?", new String[]{"1"}, 
-                    null, null, TASK_PRIORITY + " ASC, " + TASK_TITLE + " ASC");
+        Cursor cursor = db.query(TABLE_TASKS, null, 
+                TASK_IS_ACTIVE + "=?", new String[]{"1"}, 
+                null, null, TASK_PRIORITY + " ASC, " + TASK_TITLE + " ASC");
 
-            if (cursor.moveToFirst()) {
-                do {
-                    Task task = new Task();
-                    task.setId(cursor.getInt(cursor.getColumnIndexOrThrow(TASK_ID)));
-                    task.setTitle(cursor.getString(cursor.getColumnIndexOrThrow(TASK_TITLE)));
-                    task.setDescription(cursor.getString(cursor.getColumnIndexOrThrow(TASK_DESCRIPTION)));
-                    task.setPoints(cursor.getInt(cursor.getColumnIndexOrThrow(TASK_POINTS)));
-                    task.setCategory(cursor.getString(cursor.getColumnIndexOrThrow(TASK_CATEGORY)));
-                    task.setPriority(cursor.getInt(cursor.getColumnIndexOrThrow(TASK_PRIORITY)));
-                    task.setDateCreated(cursor.getString(cursor.getColumnIndexOrThrow(TASK_CREATED_DATE)));
-                    
-                    // Check if task is completed today
-                    task.setCompleted(isTaskCompletedToday(task.getId()));
-                    
-                    taskList.add(task);
-                } while (cursor.moveToNext());
-            }
-            cursor.close();
-        } finally {
-            db.close();
+        if (cursor.moveToFirst()) {
+            do {
+                Task task = new Task();
+                task.setId(cursor.getInt(cursor.getColumnIndexOrThrow(TASK_ID)));
+                task.setTitle(cursor.getString(cursor.getColumnIndexOrThrow(TASK_TITLE)));
+                task.setDescription(cursor.getString(cursor.getColumnIndexOrThrow(TASK_DESCRIPTION)));
+                task.setPoints(cursor.getInt(cursor.getColumnIndexOrThrow(TASK_POINTS)));
+                task.setCategory(cursor.getString(cursor.getColumnIndexOrThrow(TASK_CATEGORY)));
+                task.setPriority(cursor.getInt(cursor.getColumnIndexOrThrow(TASK_PRIORITY)));
+                task.setDateCreated(cursor.getString(cursor.getColumnIndexOrThrow(TASK_CREATED_DATE)));
+                
+                // Check if task is completed today
+                task.setCompleted(isTaskCompletedToday(task.getId()));
+                
+                taskList.add(task);
+            } while (cursor.moveToNext());
         }
+        cursor.close();
         return taskList;
     }
 
@@ -465,14 +544,162 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     // Delete a task
     public void deleteTask(int taskId) {
         SQLiteDatabase db = this.getWritableDatabase();
-        try {
-            // Mark task as inactive instead of deleting
-            ContentValues values = new ContentValues();
-            values.put(TASK_IS_ACTIVE, 0);
-            db.update(TABLE_TASKS, values, TASK_ID + "=?", new String[]{String.valueOf(taskId)});
-        } finally {
-            db.close();
+        // Mark task as inactive instead of deleting
+        ContentValues values = new ContentValues();
+        values.put(TASK_IS_ACTIVE, 0);
+        db.update(TABLE_TASKS, values, TASK_ID + "=?", new String[]{String.valueOf(taskId)});
+    }
+
+    // Process end-of-day penalties for uncompleted tasks
+    public synchronized void processEndOfDayPenalties(String date) {
+        // Only process dates on or after the app start date
+        if (!isDateOnOrAfterAppStart(date)) {
+            return; // Skip penalty processing for dates before app start
         }
+        
+        SQLiteDatabase db = this.getReadableDatabase();
+        
+        // Get all active tasks that were NOT completed on the given date
+        String query = "SELECT t." + TASK_ID + ", t." + TASK_POINTS + " FROM " + TABLE_TASKS + " t " +
+                "WHERE t." + TASK_IS_ACTIVE + " = 1 " +
+                "AND t." + TASK_ID + " NOT IN (" +
+                "SELECT tc." + COMPLETION_TASK_ID + " FROM " + TABLE_TASK_COMPLETIONS + " tc " +
+                "WHERE tc." + COMPLETION_DATE + " = ? AND tc." + COMPLETION_STATUS + " = 1)";
+
+        Cursor cursor = db.rawQuery(query, new String[]{date});
+        int totalPenalty = 0;
+
+        if (cursor.moveToFirst()) {
+            do {
+                int taskPoints = cursor.getInt(1);
+                totalPenalty += taskPoints; // Add points that will be deducted
+            } while (cursor.moveToNext());
+        }
+        cursor.close();
+
+        // Apply penalty if there are uncompleted tasks
+        if (totalPenalty > 0) {
+            applyDailyPenalty(date, totalPenalty);
+        }
+    }
+
+    // Apply penalty points for uncompleted tasks
+    private void applyDailyPenalty(String date, int penaltyPoints) {
+        // Get current manual and task points
+        int[] currentPoints = getManualAndTaskPoints(date);
+        int currentManualPoints = currentPoints[0];
+        int currentTaskPoints = currentPoints[1];
+        
+        // Apply penalty to manual points (user's responsibility)
+        int newManualPoints = currentManualPoints - penaltyPoints;
+        
+        ContentValues values = new ContentValues();
+        values.put(COLUMN_DATE, date);
+        values.put("manual_points", newManualPoints);
+        values.put("task_points", currentTaskPoints);
+        values.put(COLUMN_POINTS, newManualPoints + currentTaskPoints);
+
+        SQLiteDatabase writeDb = this.getWritableDatabase();
+        writeDb.insertWithOnConflict(TABLE_DAILY_POINTS, null, values, SQLiteDatabase.CONFLICT_REPLACE);
+    }
+
+    // Check if end-of-day processing has been done for a date
+    public boolean hasEndOfDayProcessingBeenDone(String date) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        
+        // Check if there are any tasks for this date
+        Cursor taskCursor = db.query(TABLE_TASKS, new String[]{TASK_ID},
+                TASK_IS_ACTIVE + "=1", null, null, null, null);
+        boolean hasTasks = taskCursor.getCount() > 0;
+        taskCursor.close();
+        
+        if (!hasTasks) {
+            return true; // No tasks to process
+        }
+        
+        // Check if the date has a daily points record
+        Cursor cursor = db.query(TABLE_DAILY_POINTS, new String[]{"manual_points", "task_points"},
+                COLUMN_DATE + "=?", new String[]{date}, null, null, null);
+
+        boolean processed = false;
+        if (cursor.moveToFirst()) {
+            // If there's a record for this date, consider it processed
+            // In a more robust system, we could add a "penalties_applied" flag
+            processed = true;
+        }
+        cursor.close();
+        return processed;
+    }
+
+    // Auto-process end-of-day penalties (can be called when app starts)
+    public void autoProcessPreviousDays() {
+        String today = getCurrentDate();
+        String appStartDate = getAppStartDate();
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        
+        try {
+            Date currentDate = sdf.parse(today);
+            Date appStart = sdf.parse(appStartDate);
+            Date processingDate = new Date(currentDate.getTime() - 24 * 60 * 60 * 1000); // Yesterday
+            
+            // Process up to 7 previous days, but not before app start date
+            for (int i = 0; i < 7; i++) {
+                String dateString = sdf.format(processingDate);
+                
+                // Only process if not already done, it's not today, and it's on or after app start
+                if (!dateString.equals(today) && 
+                    processingDate.compareTo(appStart) >= 0 && 
+                    !hasEndOfDayProcessingBeenDone(dateString)) {
+                    processEndOfDayPenalties(dateString);
+                }
+                
+                // Move to previous day
+                processingDate = new Date(processingDate.getTime() - 24 * 60 * 60 * 1000);
+                
+                // Stop if we've gone before the app start date
+                if (processingDate.before(appStart)) {
+                    break;
+                }
+            }
+        } catch (Exception e) {
+            // Handle date parsing errors
+            e.printStackTrace();
+        }
+    }
+
+    // Manually process end-of-day penalties for a specific date
+    public void manualProcessEndOfDay(String date) {
+        if (!date.equals(getCurrentDate()) && isDateOnOrAfterAppStart(date)) {
+            processEndOfDayPenalties(date);
+        }
+    }
+
+    // Get penalty points that would be applied for a given date (for preview)
+    public int getPenaltyPreview(String date) {
+        // Only show penalty for dates on or after app start
+        if (!isDateOnOrAfterAppStart(date)) {
+            return 0;
+        }
+        
+        SQLiteDatabase db = this.getReadableDatabase();
+        
+        String query = "SELECT t." + TASK_POINTS + " FROM " + TABLE_TASKS + " t " +
+                "WHERE t." + TASK_IS_ACTIVE + " = 1 " +
+                "AND t." + TASK_ID + " NOT IN (" +
+                "SELECT tc." + COMPLETION_TASK_ID + " FROM " + TABLE_TASK_COMPLETIONS + " tc " +
+                "WHERE tc." + COMPLETION_DATE + " = ? AND tc." + COMPLETION_STATUS + " = 1)";
+
+        Cursor cursor = db.rawQuery(query, new String[]{date});
+        int totalPenalty = 0;
+
+        if (cursor.moveToFirst()) {
+            do {
+                int taskPoints = cursor.getInt(0);
+                totalPenalty += taskPoints;
+            } while (cursor.moveToNext());
+        }
+        cursor.close();
+        return totalPenalty;
     }
 
     // ==== GOAL MANAGEMENT METHODS ====

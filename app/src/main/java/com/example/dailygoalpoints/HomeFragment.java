@@ -1,5 +1,6 @@
 package com.example.dailygoalpoints;
 
+import android.graphics.Color;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -9,6 +10,7 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -147,10 +149,22 @@ public class HomeFragment extends Fragment {
         // Load current points
         int currentPoints = databaseHelper.getTodayPoints();
         tvCurrentPoints.setText(String.valueOf(currentPoints));
+        
+        // Style negative current points differently
+        if (currentPoints < 0) {
+            tvCurrentPoints.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.holo_red_dark));
+        } else {
+            tvCurrentPoints.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.white));
+        }
 
         // Update progress
         int dailyTarget = databaseHelper.getDailyTarget();
-        int progressPercentage = Math.min(100, (currentPoints * 100) / dailyTarget);
+        int progressPercentage;
+        if (currentPoints < 0) {
+            progressPercentage = 0; // Don't show negative progress
+        } else {
+            progressPercentage = Math.min(100, (currentPoints * 100) / dailyTarget);
+        }
         progressDailyGoal.setProgress(progressPercentage);
 
         // Update progress message
@@ -159,6 +173,13 @@ public class HomeFragment extends Fragment {
         // Load total points
         int totalPoints = databaseHelper.getTotalPoints();
         tvTotalPoints.setText(String.valueOf(totalPoints));
+        
+        // Style negative points differently
+        if (totalPoints < 0) {
+            tvTotalPoints.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.holo_red_dark));
+        } else {
+            tvTotalPoints.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.black));
+        }
 
         // Calculate and display streak
         int streak = calculateStreak();
@@ -182,7 +203,9 @@ public class HomeFragment extends Fragment {
 
     private void updateProgressMessage(int currentPoints, int dailyTarget) {
         String message;
-        if (currentPoints >= dailyTarget) {
+        if (currentPoints < 0) {
+            message = "⚠️ Negative points! Complete tasks to recover!";
+        } else if (currentPoints >= dailyTarget) {
             message = "🎉 Amazing! Goal achieved for today!";
         } else if (currentPoints >= dailyTarget * 0.8) {
             message = "🔥 Almost there! Keep pushing!";
