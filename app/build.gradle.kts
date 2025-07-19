@@ -39,6 +39,14 @@ dependencies {
     implementation(libs.constraintlayout)
     // Add MPAndroidChart for graphs
     implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
+    // ViewPager2 for page navigation
+    implementation("androidx.viewpager2:viewpager2:1.0.0")
+    // Fragment support
+    implementation("androidx.fragment:fragment:1.6.2")
+    // CardView
+    implementation("androidx.cardview:cardview:1.0.0")
+    // RecyclerView
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
