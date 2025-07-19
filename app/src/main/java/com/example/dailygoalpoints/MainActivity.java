@@ -27,6 +27,9 @@ public class MainActivity extends AppCompatActivity implements
         // Process end-of-day penalties for previous days
         DatabaseHelper dbHelper = new DatabaseHelper(this);
         dbHelper.autoProcessPreviousDays();
+        
+        // Clean up completed "once" tasks
+        dbHelper.cleanupOnceTasks();
     }
 
     private void initializeViews() {

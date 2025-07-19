@@ -13,7 +13,7 @@ import java.util.Locale;
 
 public class DatabaseHelper extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "daily_points.db";
-    private static final int DATABASE_VERSION = 4; // Updated version for app settings
+    private static final int DATABASE_VERSION = 5; // Updated version for frequency feature
 
     // Table names
     private static final String TABLE_DAILY_POINTS = "daily_points";
@@ -36,6 +36,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     private static final String TASK_PRIORITY = "task_priority";
     private static final String TASK_CREATED_DATE = "task_created_date";
     private static final String TASK_IS_ACTIVE = "task_is_active";
+    private static final String TASK_FREQUENCY = "task_frequency";
+    private static final String TASK_CUSTOM_DAYS = "task_custom_days";
 
     // Column names for goals
     private static final String GOAL_ID = "goal_id";
@@ -82,7 +84,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 + TASK_CATEGORY + " TEXT,"
                 + TASK_PRIORITY + " INTEGER DEFAULT 2,"
                 + TASK_CREATED_DATE + " TEXT NOT NULL,"
-                + TASK_IS_ACTIVE + " INTEGER DEFAULT 1"
+                + TASK_IS_ACTIVE + " INTEGER DEFAULT 1,"
+                + TASK_FREQUENCY + " TEXT DEFAULT 'once',"
+                + TASK_CUSTOM_DAYS + " TEXT DEFAULT ''"
                 + ")";
         db.execSQL(CREATE_TASKS_TABLE);
 
@@ -186,6 +190,16 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             
             // Set app start date
             setAppStartDate(db);
+        }
+
+        if (oldVersion < 5) {
+            // Add frequency columns to tasks table
+            try {
+                db.execSQL("ALTER TABLE " + TABLE_TASKS + " ADD COLUMN " + TASK_FREQUENCY + " TEXT DEFAULT 'once'");
+                db.execSQL("ALTER TABLE " + TABLE_TASKS + " ADD COLUMN " + TASK_CUSTOM_DAYS + " TEXT DEFAULT ''");
+            } catch (Exception e) {
+                // Columns might already exist, ignore
+            }
         }
     }
 
@@ -406,6 +420,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         values.put(TASK_PRIORITY, task.getPriority());
         values.put(TASK_CREATED_DATE, getCurrentDate());
         values.put(TASK_IS_ACTIVE, 1);
+        values.put(TASK_FREQUENCY, task.getFrequency());
+        values.put(TASK_CUSTOM_DAYS, task.getCustomDays());
 
         return db.insert(TABLE_TASKS, null, values);
     }
@@ -419,6 +435,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         values.put(TASK_POINTS, task.getPoints());
         values.put(TASK_CATEGORY, task.getCategory());
         values.put(TASK_PRIORITY, task.getPriority());
+        values.put(TASK_FREQUENCY, task.getFrequency());
+        values.put(TASK_CUSTOM_DAYS, task.getCustomDays());
         // Don't update created_date or is_active when updating
 
         return db.update(TABLE_TASKS, values, TASK_ID + "=?", 
@@ -444,6 +462,21 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 task.setCategory(cursor.getString(cursor.getColumnIndexOrThrow(TASK_CATEGORY)));
                 task.setPriority(cursor.getInt(cursor.getColumnIndexOrThrow(TASK_PRIORITY)));
                 task.setDateCreated(cursor.getString(cursor.getColumnIndexOrThrow(TASK_CREATED_DATE)));
+                
+                // Read frequency columns (with defaults for old records)
+                int frequencyIndex = cursor.getColumnIndex(TASK_FREQUENCY);
+                if (frequencyIndex != -1) {
+                    task.setFrequency(cursor.getString(frequencyIndex));
+                } else {
+                    task.setFrequency("once"); // Default for old records
+                }
+                
+                int customDaysIndex = cursor.getColumnIndex(TASK_CUSTOM_DAYS);
+                if (customDaysIndex != -1) {
+                    task.setCustomDays(cursor.getString(customDaysIndex));
+                } else {
+                    task.setCustomDays(""); // Default for old records
+                }
                 
                 // Check if task is completed today
                 task.setCompleted(isTaskCompletedToday(task.getId()));
@@ -549,6 +582,50 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         values.put(TASK_IS_ACTIVE, 0);
         db.update(TABLE_TASKS, values, TASK_ID + "=?", new String[]{String.valueOf(taskId)});
     }
+
+    // Clean up "once" tasks at end of day (remove completed ones)
+    public void cleanupOnceTasks() {
+        SQLiteDatabase db = this.getWritableDatabase();
+        String today = getCurrentDate();
+        
+        // Find all "once" frequency tasks that are completed today
+        String query = "SELECT DISTINCT t." + TASK_ID + " FROM " + TABLE_TASKS + " t " +
+                "INNER JOIN " + TABLE_TASK_COMPLETIONS + " tc ON t." + TASK_ID + " = tc." + COMPLETION_TASK_ID + " " +
+                "WHERE t." + TASK_FREQUENCY + " = 'once' AND tc." + COMPLETION_DATE + " = ? AND tc." + COMPLETION_STATUS + " = 1";
+        
+        Cursor cursor = db.rawQuery(query, new String[]{today});
+        
+        if (cursor.moveToFirst()) {
+            do {
+                int taskId = cursor.getInt(0);
+                // Mark as inactive (delete)
+                ContentValues values = new ContentValues();
+                values.put(TASK_IS_ACTIVE, 0);
+                db.update(TABLE_TASKS, values, TASK_ID + "=?", new String[]{String.valueOf(taskId)});
+            } while (cursor.moveToNext());
+        }
+        cursor.close();
+    }
+
+    // Get tasks visible for today based on frequency
+    public List<Task> getTodaysTasks() {
+        List<Task> allTasks = getAllActiveTasks();
+        List<Task> todaysTasks = new ArrayList<>();
+        
+        // Get current day of week (1=Sunday, 2=Monday, ..., 7=Saturday)
+        java.util.Calendar calendar = java.util.Calendar.getInstance();
+        int dayOfWeek = calendar.get(java.util.Calendar.DAY_OF_WEEK);
+        
+        for (Task task : allTasks) {
+            if (task.isVisibleOnDay(dayOfWeek)) {
+                todaysTasks.add(task);
+            }
+        }
+        
+        return todaysTasks;
+    }
+
+    // ==== END-OF-DAY PROCESSING ====
 
     // Process end-of-day penalties for uncompleted tasks
     public synchronized void processEndOfDayPenalties(String date) {

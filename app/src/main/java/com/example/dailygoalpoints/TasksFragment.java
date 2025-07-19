@@ -72,7 +72,7 @@ public class TasksFragment extends Fragment {
     }
 
     private void setupRecyclerView() {
-        taskAdapter = new TaskAdapter(databaseHelper.getAllActiveTasks(), new TaskAdapter.OnTaskActionListener() {
+        taskAdapter = new TaskAdapter(databaseHelper.getTodaysTasks(), new TaskAdapter.OnTaskActionListener() {
             @Override
             public void onTaskToggle(Task task) {
                 databaseHelper.toggleTaskCompletion(task.getId());
@@ -135,7 +135,7 @@ public class TasksFragment extends Fragment {
         updateProgressMessage(currentPoints, dailyTarget);
 
         // Load tasks
-        List<Task> tasks = databaseHelper.getAllActiveTasks();
+        List<Task> tasks = databaseHelper.getTodaysTasks();
         taskAdapter.updateTasks(tasks);
 
         // Show/hide empty state

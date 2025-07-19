@@ -186,7 +186,7 @@ public class HomeFragment extends Fragment {
         tvStreakCount.setText(String.valueOf(streak));
 
         // Load tasks preview
-        List<Task> tasks = databaseHelper.getAllActiveTasks();
+        List<Task> tasks = databaseHelper.getTodaysTasks();
         int completedTasks = 0;
         for (Task task : tasks) {
             if (task.isCompleted()) completedTasks++;
