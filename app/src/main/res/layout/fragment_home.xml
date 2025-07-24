@@ -295,7 +295,7 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="12dp"
+                    android:layout_marginBottom="16dp"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
@@ -303,18 +303,41 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="7-Day Progress"
+                        android:text="Progress Chart"
                         android:textColor="@color/text_primary"
                         android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tv_chart_period"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:text="7 Days"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp"
                         android:textStyle="bold" />
 
                     <TextView
                         android:id="@+id/tv_average_points"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
                         android:text="Avg: 0.0"
                         android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
+
+                    <ImageView
+                        android:id="@+id/iv_chart_menu"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:padding="4dp"
+                        android:src="@drawable/ic_more_vert"
+                        android:tint="@color/text_secondary"
+                        android:contentDescription="Chart options menu" />
 
                 </LinearLayout>
 

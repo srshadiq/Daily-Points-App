@@ -1,6 +1,11 @@
 package com.example.dailygoalpoints;
 
+import android.content.SharedPreferences;
 import android.os.Bundle;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.viewpager2.widget.ViewPager2;
 import com.google.android.material.tabs.TabLayout;
@@ -27,6 +32,9 @@ public class MainActivity extends AppCompatActivity implements
         // Process end-of-day penalties for previous days
         DatabaseHelper dbHelper = new DatabaseHelper(this);
         dbHelper.autoProcessPreviousDays();
+        
+        // Show penalty summary if there were any recent penalties
+        showRecentPenaltySummary(dbHelper);
         
         // Clean up completed "once" tasks
         dbHelper.cleanupOnceTasks();
@@ -74,6 +82,49 @@ public class MainActivity extends AppCompatActivity implements
         }
         if (tasksFragment != null) {
             tasksFragment.refreshData();
+        }
+    }
+    
+    private void showRecentPenaltySummary(DatabaseHelper dbHelper) {
+        // Check if dialog has already been shown today
+        SharedPreferences prefs = getSharedPreferences("daily_dialogs", MODE_PRIVATE);
+        String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
+        String lastShownDate = prefs.getString("penalty_dialog_last_shown", "");
+        
+        // If dialog was already shown today, don't show it again
+        if (today.equals(lastShownDate)) {
+            return;
+        }
+        
+        List<DatabaseHelper.PenaltySummary> penalties = dbHelper.getRecentPenalties(3);
+        
+        if (!penalties.isEmpty()) {
+            StringBuilder message = new StringBuilder("Recent penalties applied:\n\n");
+            int totalPenalty = 0;
+            
+            for (DatabaseHelper.PenaltySummary penalty : penalties) {
+                message.append("📅 ").append(penalty.getFormattedDate())
+                       .append(": -").append(penalty.getPenaltyPoints())
+                       .append(" points\n");
+                totalPenalty += penalty.getPenaltyPoints();
+            }
+            
+            message.append("\n⚠️ Total penalty: -").append(totalPenalty).append(" points")
+                   .append("\n\n💡 Complete tasks daily to avoid penalties!");
+            
+            new android.app.AlertDialog.Builder(this)
+                .setTitle("Task Completion Penalties")
+                .setMessage(message.toString())
+                .setIcon(android.R.drawable.ic_dialog_info)
+                .setPositiveButton("Got it!", (dialog, which) -> {
+                    // Mark dialog as shown for today
+                    prefs.edit().putString("penalty_dialog_last_shown", today).apply();
+                })
+                .setOnDismissListener(dialog -> {
+                    // Also mark as shown if user dismisses dialog by tapping outside
+                    prefs.edit().putString("penalty_dialog_last_shown", today).apply();
+                })
+                .show();
         }
     }
 }

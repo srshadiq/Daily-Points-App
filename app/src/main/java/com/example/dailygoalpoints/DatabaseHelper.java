@@ -338,6 +338,93 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         return pointsList;
     }
 
+    // Get last 7 days points
+    public List<DailyPoint> getLast7DaysPoints() {
+        List<DailyPoint> pointsList = new ArrayList<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+
+        String selectQuery = "SELECT * FROM " + TABLE_DAILY_POINTS +
+                " ORDER BY " + COLUMN_DATE + " DESC LIMIT 7";
+
+        Cursor cursor = db.rawQuery(selectQuery, null);
+
+        if (cursor.moveToFirst()) {
+            do {
+                DailyPoint point = new DailyPoint();
+                point.setDate(cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_DATE)));
+                point.setPoints(cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_POINTS)));
+                pointsList.add(point);
+            } while (cursor.moveToNext());
+        }
+        cursor.close();
+
+        java.util.Collections.reverse(pointsList);
+        return pointsList;
+    }
+
+    // Get last N months points
+    public List<DailyPoint> getLastNMonthsPoints(int months) {
+        List<DailyPoint> pointsList = new ArrayList<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+
+        // Calculate date N months ago
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        cal.add(java.util.Calendar.MONTH, -months);
+        String dateNMonthsAgo = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(cal.getTime());
+
+        String selectQuery = "SELECT * FROM " + TABLE_DAILY_POINTS +
+                " WHERE " + COLUMN_DATE + " >= '" + dateNMonthsAgo + "'" +
+                " ORDER BY " + COLUMN_DATE + " ASC";
+
+        Cursor cursor = db.rawQuery(selectQuery, null);
+
+        if (cursor.moveToFirst()) {
+            do {
+                DailyPoint point = new DailyPoint();
+                point.setDate(cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_DATE)));
+                point.setPoints(cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_POINTS)));
+                pointsList.add(point);
+            } while (cursor.moveToNext());
+        }
+        cursor.close();
+
+        return pointsList;
+    }
+
+    // Get last N years points
+    public List<DailyPoint> getLastNYearsPoints(int years) {
+        List<DailyPoint> pointsList = new ArrayList<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+
+        // Calculate date N years ago
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        cal.add(java.util.Calendar.YEAR, -years);
+        String dateNYearsAgo = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(cal.getTime());
+
+        String selectQuery = "SELECT * FROM " + TABLE_DAILY_POINTS +
+                " WHERE " + COLUMN_DATE + " >= '" + dateNYearsAgo + "'" +
+                " ORDER BY " + COLUMN_DATE + " ASC";
+
+        Cursor cursor = db.rawQuery(selectQuery, null);
+
+        if (cursor.moveToFirst()) {
+            do {
+                DailyPoint point = new DailyPoint();
+                point.setDate(cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_DATE)));
+                point.setPoints(cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_POINTS)));
+                pointsList.add(point);
+            } while (cursor.moveToNext());
+        }
+        cursor.close();
+
+        return pointsList;
+    }
+
+    // Get all time points
+    public List<DailyPoint> getAllTimePoints() {
+        return getAllPoints(); // This already exists and gets all points
+    }
+
     // Insert or update daily points
     public void insertOrUpdateDailyPoints(String date, int points) {
         SQLiteDatabase db = this.getWritableDatabase();
@@ -678,6 +765,16 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
         SQLiteDatabase writeDb = this.getWritableDatabase();
         writeDb.insertWithOnConflict(TABLE_DAILY_POINTS, null, values, SQLiteDatabase.CONFLICT_REPLACE);
+        
+        // Log penalty for user feedback
+        logPenaltyApplication(date, penaltyPoints);
+    }
+    
+    // Log penalty application for user awareness
+    private void logPenaltyApplication(String date, int penaltyPoints) {
+        // This could be enhanced to show a notification or toast
+        // For now, we'll just keep it simple
+        System.out.println("Penalty applied for " + date + ": -" + penaltyPoints + " points for incomplete tasks");
     }
 
     // Check if end-of-day processing has been done for a date
@@ -777,6 +874,59 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         }
         cursor.close();
         return totalPenalty;
+    }
+    
+    // Get penalty summary for the last N days
+    public List<PenaltySummary> getRecentPenalties(int days) {
+        List<PenaltySummary> penalties = new ArrayList<>();
+        String today = getCurrentDate();
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        
+        try {
+            Date currentDate = sdf.parse(today);
+            
+            for (int i = 1; i <= days; i++) {
+                Date checkDate = new Date(currentDate.getTime() - (i * 24 * 60 * 60 * 1000));
+                String dateString = sdf.format(checkDate);
+                
+                // Only check dates on or after app start
+                if (isDateOnOrAfterAppStart(dateString)) {
+                    int penalty = getPenaltyPreview(dateString);
+                    if (penalty > 0) {
+                        penalties.add(new PenaltySummary(dateString, penalty));
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        
+        return penalties;
+    }
+    
+    // Helper class for penalty summary
+    public static class PenaltySummary {
+        private String date;
+        private int penaltyPoints;
+        
+        public PenaltySummary(String date, int penaltyPoints) {
+            this.date = date;
+            this.penaltyPoints = penaltyPoints;
+        }
+        
+        public String getDate() { return date; }
+        public int getPenaltyPoints() { return penaltyPoints; }
+        
+        public String getFormattedDate() {
+            try {
+                SimpleDateFormat inputFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+                SimpleDateFormat outputFormat = new SimpleDateFormat("MMM dd", Locale.getDefault());
+                Date date = inputFormat.parse(this.date);
+                return outputFormat.format(date);
+            } catch (Exception e) {
+                return date;
+            }
+        }
     }
 
     // ==== GOAL MANAGEMENT METHODS ====

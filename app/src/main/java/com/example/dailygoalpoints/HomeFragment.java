@@ -3,8 +3,11 @@ package com.example.dailygoalpoints;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.view.LayoutInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
+import android.widget.PopupMenu;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
@@ -32,9 +35,10 @@ import java.util.Locale;
 public class HomeFragment extends Fragment {
 
     private TextView tvCurrentPoints, tvGoalTitle, tvDailyTarget, tvProgressMessage;
-    private TextView tvTotalPoints, tvStreakCount, tvAveragePoints, tvTasksCompleted;
+    private TextView tvTotalPoints, tvStreakCount, tvAveragePoints, tvTasksCompleted, tvChartPeriod;
     private ProgressBar progressDailyGoal;
     private MaterialButton btnAddPoint, btnSubtractPoint, btnViewAllTasks;
+    private ImageView ivChartMenu;
     private LineChart lineChart;
     private RecyclerView rvTaskPreview;
 
@@ -42,6 +46,13 @@ public class HomeFragment extends Fragment {
     private TaskPreviewAdapter taskPreviewAdapter;
     private OnPageNavigationListener navigationListener;
     private OnDataChangeListener dataChangeListener;
+    
+    // Chart time period enum
+    private enum TimePeriod {
+        SEVEN_DAYS, ONE_MONTH, THREE_MONTHS, ONE_YEAR, ALL_TIME
+    }
+    
+    private TimePeriod currentTimePeriod = TimePeriod.SEVEN_DAYS;
 
     public interface OnPageNavigationListener {
         void navigateToTasks();
@@ -74,6 +85,7 @@ public class HomeFragment extends Fragment {
         setupClickListeners();
         
         databaseHelper = new DatabaseHelper(getContext());
+        updateChartPeriodDisplay(); // Set initial period display
         loadData();
     }
 
@@ -86,12 +98,16 @@ public class HomeFragment extends Fragment {
         tvStreakCount = view.findViewById(R.id.tv_streak_count);
         tvAveragePoints = view.findViewById(R.id.tv_average_points);
         tvTasksCompleted = view.findViewById(R.id.tv_tasks_completed);
+        tvChartPeriod = view.findViewById(R.id.tv_chart_period);
         
         progressDailyGoal = view.findViewById(R.id.progress_daily_goal);
         
         btnAddPoint = view.findViewById(R.id.btn_add_point);
         btnSubtractPoint = view.findViewById(R.id.btn_subtract_point);
         btnViewAllTasks = view.findViewById(R.id.btn_view_all_tasks);
+        
+        // Chart menu icon
+        ivChartMenu = view.findViewById(R.id.iv_chart_menu);
         
         lineChart = view.findViewById(R.id.line_chart);
         rvTaskPreview = view.findViewById(R.id.rv_task_preview);
@@ -136,6 +152,9 @@ public class HomeFragment extends Fragment {
                 navigationListener.navigateToTasks();
             }
         });
+        
+        // Chart menu click listener
+        ivChartMenu.setOnClickListener(v -> showChartPeriodMenu(v));
     }
 
     private void loadData() {
@@ -202,9 +221,17 @@ public class HomeFragment extends Fragment {
     }
 
     private void updateProgressMessage(int currentPoints, int dailyTarget) {
+        // Check if there are recent penalties to inform the user
+        List<DatabaseHelper.PenaltySummary> recentPenalties = databaseHelper.getRecentPenalties(1);
+        boolean hasRecentPenalty = !recentPenalties.isEmpty();
+        
         String message;
         if (currentPoints < 0) {
-            message = "⚠️ Negative points! Complete tasks to recover!";
+            if (hasRecentPenalty) {
+                message = "⚠️ Negative points from task penalties! Complete today's tasks to recover!";
+            } else {
+                message = "⚠️ Negative points! Complete tasks to recover!";
+            }
         } else if (currentPoints >= dailyTarget) {
             message = "🎉 Amazing! Goal achieved for today!";
         } else if (currentPoints >= dailyTarget * 0.8) {
@@ -212,9 +239,17 @@ public class HomeFragment extends Fragment {
         } else if (currentPoints >= dailyTarget * 0.5) {
             message = "💪 Great progress! You're halfway there!";
         } else if (currentPoints > 0) {
-            message = "🚀 Good start! Keep going!";
+            if (hasRecentPenalty) {
+                message = "🚀 Good start! Remember: incomplete tasks result in penalties!";
+            } else {
+                message = "🚀 Good start! Keep going!";
+            }
         } else {
-            message = "⭐ Ready to start your day? Let's go!";
+            if (hasRecentPenalty) {
+                message = "⭐ New day, fresh start! Complete tasks to avoid penalties!";
+            } else {
+                message = "⭐ Ready to start your day? Let's go!";
+            }
         }
         tvProgressMessage.setText(message);
     }
@@ -236,11 +271,97 @@ public class HomeFragment extends Fragment {
         return streak;
     }
 
+    private void showChartPeriodMenu(View anchorView) {
+        PopupMenu popup = new PopupMenu(getContext(), anchorView);
+        
+        // Add menu items
+        popup.getMenu().add(0, 0, 0, "7 Days");
+        popup.getMenu().add(0, 1, 1, "1 Month");
+        popup.getMenu().add(0, 2, 2, "3 Months");
+        popup.getMenu().add(0, 3, 3, "1 Year");
+        popup.getMenu().add(0, 4, 4, "All Time");
+        
+        // Set current selection as checked
+        MenuItem currentItem = null;
+        switch (currentTimePeriod) {
+            case SEVEN_DAYS:
+                currentItem = popup.getMenu().getItem(0);
+                break;
+            case ONE_MONTH:
+                currentItem = popup.getMenu().getItem(1);
+                break;
+            case THREE_MONTHS:
+                currentItem = popup.getMenu().getItem(2);
+                break;
+            case ONE_YEAR:
+                currentItem = popup.getMenu().getItem(3);
+                break;
+            case ALL_TIME:
+                currentItem = popup.getMenu().getItem(4);
+                break;
+        }
+        if (currentItem != null) {
+            currentItem.setChecked(true);
+        }
+        
+        // Set click listener
+        popup.setOnMenuItemClickListener(item -> {
+            switch (item.getItemId()) {
+                case 0:
+                    currentTimePeriod = TimePeriod.SEVEN_DAYS;
+                    break;
+                case 1:
+                    currentTimePeriod = TimePeriod.ONE_MONTH;
+                    break;
+                case 2:
+                    currentTimePeriod = TimePeriod.THREE_MONTHS;
+                    break;
+                case 3:
+                    currentTimePeriod = TimePeriod.ONE_YEAR;
+                    break;
+                case 4:
+                    currentTimePeriod = TimePeriod.ALL_TIME;
+                    break;
+            }
+            updateChartPeriodDisplay();
+            loadChart();
+            return true;
+        });
+        
+        popup.show();
+    }
+
+    private void updateChartPeriodDisplay() {
+        String periodText;
+        switch (currentTimePeriod) {
+            case SEVEN_DAYS:
+                periodText = "7 Days";
+                break;
+            case ONE_MONTH:
+                periodText = "1 Month";
+                break;
+            case THREE_MONTHS:
+                periodText = "3 Months";
+                break;
+            case ONE_YEAR:
+                periodText = "1 Year";
+                break;
+            case ALL_TIME:
+                periodText = "All Time";
+                break;
+            default:
+                periodText = "7 Days";
+                break;
+        }
+        tvChartPeriod.setText(periodText);
+    }
+
     private void loadChart() {
-        List<DailyPoint> dailyPoints = databaseHelper.getLast30DaysPoints();
+        List<DailyPoint> dailyPoints = getPointsForCurrentPeriod();
         
         if (dailyPoints.isEmpty()) {
             lineChart.clear();
+            tvAveragePoints.setText("Avg: 0.0");
             return;
         }
 
@@ -253,9 +374,8 @@ public class HomeFragment extends Fragment {
             entries.add(new Entry(i, point.getPoints()));
             totalPoints += point.getPoints();
 
-            // Format date for display
-            String[] dateParts = point.getDate().split("-");
-            dates.add(dateParts[1] + "/" + dateParts[2]);
+            // Format date based on time period
+            dates.add(formatDateForPeriod(point.getDate()));
         }
 
         // Calculate and display average
@@ -281,6 +401,13 @@ public class HomeFragment extends Fragment {
         xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
         xAxis.setGranularity(1f);
         xAxis.setLabelRotationAngle(-45f);
+        
+        // Adjust label count based on data size
+        if (dailyPoints.size() > 30) {
+            xAxis.setLabelCount(Math.min(10, dailyPoints.size()), false);
+        } else {
+            xAxis.setLabelCount(Math.min(dailyPoints.size(), 10), false);
+        }
 
         // Customize chart
         lineChart.getDescription().setEnabled(false);
@@ -292,6 +419,52 @@ public class HomeFragment extends Fragment {
 
         // Refresh chart
         lineChart.invalidate();
+    }
+
+    private List<DailyPoint> getPointsForCurrentPeriod() {
+        switch (currentTimePeriod) {
+            case SEVEN_DAYS:
+                return databaseHelper.getLast7DaysPoints();
+            case ONE_MONTH:
+                return databaseHelper.getLastNMonthsPoints(1);
+            case THREE_MONTHS:
+                return databaseHelper.getLastNMonthsPoints(3);
+            case ONE_YEAR:
+                return databaseHelper.getLastNYearsPoints(1);
+            case ALL_TIME:
+                return databaseHelper.getAllTimePoints();
+            default:
+                return databaseHelper.getLast7DaysPoints();
+        }
+    }
+
+    private String formatDateForPeriod(String date) {
+        try {
+            String[] dateParts = date.split("-");
+            
+            switch (currentTimePeriod) {
+                case SEVEN_DAYS:
+                    // For 7 days, show MM/dd format
+                    return dateParts[1] + "/" + dateParts[2];
+                case ONE_MONTH:
+                    // For 1 month, show MM/dd format
+                    return dateParts[1] + "/" + dateParts[2];
+                case THREE_MONTHS:
+                case ONE_YEAR:
+                    // For longer periods, show MMM dd format
+                    String[] months = {"", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+                    int month = Integer.parseInt(dateParts[1]);
+                    return months[month] + " " + dateParts[2];
+                case ALL_TIME:
+                    // For all time, show yyyy/MM format
+                    return dateParts[0] + "/" + dateParts[1];
+                default:
+                    return dateParts[1] + "/" + dateParts[2];
+            }
+        } catch (Exception e) {
+            return date;
+        }
     }
 
     public void refreshData() {

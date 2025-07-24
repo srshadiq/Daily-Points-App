@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Daily Scores</string>
+    <string name="app_name">Daily Points</string>
     <string name="widget_description">Track your daily points with quick access buttons and progress graph</string>
     <string name="widget_enhanced_description">Enhanced daily points tracker with progress indicators and trend analysis</string>
     <string name="widget_graph_description">Detailed progress chart showing 30-day trends and statistics</string>

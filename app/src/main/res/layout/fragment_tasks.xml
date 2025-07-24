@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    xmlns:app1="http://schemas.android.com/apk/res-auto"
-    android:background="@color/background_light">
+    android:background="@color/background_light"
+    >
 
     <!-- Goal Settings Card -->
     <androidx.cardview.widget.CardView
@@ -12,11 +12,11 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_margin="16dp"
-        app1:cardCornerRadius="12dp"
-        app1:cardElevation="4dp"
-        app1:layout_constraintEnd_toEndOf="parent"
-        app1:layout_constraintStart_toStartOf="parent"
-        app1:layout_constraintTop_toTopOf="parent">
+        app:cardCornerRadius="12dp"
+        app:cardElevation="4dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -165,10 +165,10 @@
         android:layout_height="0dp"
         android:layout_margin="16dp"
         android:orientation="vertical"
-        app1:layout_constraintBottom_toBottomOf="parent"
-        app1:layout_constraintEnd_toEndOf="parent"
-        app1:layout_constraintStart_toStartOf="parent"
-        app1:layout_constraintTop_toBottomOf="@id/card_goal_settings">
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/card_goal_settings">
 
         <!-- Tasks Header -->
         <LinearLayout
@@ -194,7 +194,7 @@
                 android:backgroundTint="@color/primary_color"
                 android:text="Add Task"
                 android:textColor="@android:color/white"
-                app1:cornerRadius="20dp"
+                app:cornerRadius="20dp"
                 app:icon="@drawable/ic_add"
                 app:iconTint="@android:color/white" />
 
@@ -208,6 +208,43 @@
             android:layout_weight="1"
             android:clipToPadding="false"
             android:paddingBottom="16dp" />
+        <!-- Penalty Information Card -->
+        <!--<androidx.cardview.widget.CardView
+            android:id="@+id/card_penalty_info"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="16dp"
+            android:visibility="visible"
+            app:cardCornerRadius="8dp"
+            app:cardElevation="2dp"
+            app:cardBackgroundColor="@color/warning_background">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:padding="12dp"
+                android:gravity="center_vertical">
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:layout_marginEnd="8dp"
+                    android:src="@drawable/ic_warning"
+                    android:tint="@color/warning_color" />
+
+                <TextView
+                    android:id="@+id/tv_penalty_message"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="⚠️ Incomplete tasks will result in point penalties at the end of the day"
+                    android:textColor="@color/warning_text"
+                    android:textSize="12sp" />
+
+            </LinearLayout>
+
+        </androidx.cardview.widget.CardView>-->
 
         <!-- Empty State -->
         <LinearLayout

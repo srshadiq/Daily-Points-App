@@ -11,6 +11,8 @@
     <color name="success_color">#4CAF50</color>
     <color name="error_color">#F44336</color>
     <color name="warning_color">#FFC107</color>
+    <color name="warning_background">#FFF3C4</color>
+    <color name="warning_text">#8A6914</color>
     
     <!-- Text Colors -->
     <color name="text_primary">#212121</color>

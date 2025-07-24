@@ -12,22 +12,25 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
+import androidx.cardview.widget.CardView;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.button.MaterialButton;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class TasksFragment extends Fragment {
 
     private TextView tvDailyGoalTarget, tvGoalDescription;
-    private TextView tvCurrentPoints, tvDailyTarget, tvProgressMessage;
+    private TextView tvCurrentPoints, tvDailyTarget, tvProgressMessage, tvPenaltyMessage;
     private ProgressBar progressDailyGoal;
     private MaterialButton btnEditGoal, btnAddTask;
     private RecyclerView rvTasks;
     private LinearLayout layoutEmptyState;
+    private CardView cardPenaltyInfo;
 
     private DatabaseHelper databaseHelper;
     private TaskAdapter taskAdapter;
@@ -69,10 +72,12 @@ public class TasksFragment extends Fragment {
         btnAddTask = view.findViewById(R.id.btn_add_task);
         rvTasks = view.findViewById(R.id.rv_tasks);
         layoutEmptyState = view.findViewById(R.id.layout_empty_state);
+//        cardPenaltyInfo = view.findViewById(R.id.card_penalty_info);
+//        tvPenaltyMessage = view.findViewById(R.id.tv_penalty_message);
     }
 
     private void setupRecyclerView() {
-        taskAdapter = new TaskAdapter(databaseHelper.getTodaysTasks(), new TaskAdapter.OnTaskActionListener() {
+        taskAdapter = new TaskAdapter(new ArrayList<>(), new TaskAdapter.OnTaskActionListener() {
             @Override
             public void onTaskToggle(Task task) {
                 databaseHelper.toggleTaskCompletion(task.getId());
@@ -97,14 +102,31 @@ public class TasksFragment extends Fragment {
     }
 
     private void setupClickListeners() {
-        btnAddTask.setOnClickListener(v -> showAddTaskDialog());
-        btnEditGoal.setOnClickListener(v -> showEditGoalDialog());
+        if (btnAddTask != null) {
+            btnAddTask.setOnClickListener(v -> showAddTaskDialog());
+        }
+        if (btnEditGoal != null) {
+            btnEditGoal.setOnClickListener(v -> showEditGoalDialog());
+        }
+        
+        // Long press on add task button to test penalty system (for development)
+        if (btnAddTask != null) {
+            btnAddTask.setOnLongClickListener(v -> {
+                showPenaltyTestDialog();
+                return true;
+            });
+        }
     }
 
     private void loadData() {
+        // Add null check for safety
+        if (databaseHelper == null) {
+            return;
+        }
+        
         // Load current goal
         Goal currentGoal = databaseHelper.getCurrentGoal();
-        if (currentGoal != null) {
+        if (currentGoal != null && tvDailyGoalTarget != null) {
             tvDailyGoalTarget.setText(String.valueOf(currentGoal.getDailyTarget()));
             tvGoalDescription.setText(currentGoal.getDescription());
             tvDailyTarget.setText(String.valueOf(currentGoal.getDailyTarget()));
@@ -112,13 +134,15 @@ public class TasksFragment extends Fragment {
 
         // Load current points and update progress
         int currentPoints = databaseHelper.getTodayPoints();
-        tvCurrentPoints.setText(String.valueOf(currentPoints));
-        
-        // Style negative current points differently
-        if (currentPoints < 0) {
-            tvCurrentPoints.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.holo_red_dark));
-        } else {
-            tvCurrentPoints.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.black));
+        if (tvCurrentPoints != null) {
+            tvCurrentPoints.setText(String.valueOf(currentPoints));
+            
+            // Style negative current points differently
+            if (currentPoints < 0) {
+                tvCurrentPoints.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.holo_red_dark));
+            } else {
+                tvCurrentPoints.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.black));
+            }
         }
 
         // Update progress bar
@@ -129,26 +153,36 @@ public class TasksFragment extends Fragment {
         } else {
             progressPercentage = Math.min(100, (currentPoints * 100) / dailyTarget);
         }
-        progressDailyGoal.setProgress(progressPercentage);
+        if (progressDailyGoal != null) {
+            progressDailyGoal.setProgress(progressPercentage);
+        }
 
         // Update progress message
         updateProgressMessage(currentPoints, dailyTarget);
 
         // Load tasks
         List<Task> tasks = databaseHelper.getTodaysTasks();
-        taskAdapter.updateTasks(tasks);
+        if (taskAdapter != null) {
+            taskAdapter.updateTasks(tasks);
+        }
 
         // Show/hide empty state
         if (tasks.isEmpty()) {
-            rvTasks.setVisibility(View.GONE);
-            layoutEmptyState.setVisibility(View.VISIBLE);
+            if (rvTasks != null) rvTasks.setVisibility(View.GONE);
+            if (layoutEmptyState != null) layoutEmptyState.setVisibility(View.VISIBLE);
+//            if (cardPenaltyInfo != null) cardPenaltyInfo.setVisibility(View.GONE);
         } else {
-            rvTasks.setVisibility(View.VISIBLE);
-            layoutEmptyState.setVisibility(View.GONE);
+            if (rvTasks != null) rvTasks.setVisibility(View.VISIBLE);
+            if (layoutEmptyState != null) layoutEmptyState.setVisibility(View.GONE);
+            
+            // Show penalty warning only if there are incomplete tasks
+//            updatePenaltyMessage(tasks);
         }
     }
 
     private void updateProgressMessage(int currentPoints, int dailyTarget) {
+        if (tvProgressMessage == null) return;
+        
         String message;
         if (currentPoints < 0) {
             message = "⚠️ Negative points! Complete tasks to recover!";
@@ -164,6 +198,32 @@ public class TasksFragment extends Fragment {
             message = "⭐ Ready to start your day? Let's go!";
         }
         tvProgressMessage.setText(message);
+    }
+    
+    private void updatePenaltyMessage(List<Task> tasks) {
+        if (tvPenaltyMessage == null || cardPenaltyInfo == null) return;
+        
+        int incompleteCount = 0;
+        int totalPenaltyPoints = 0;
+        
+        for (Task task : tasks) {
+            if (!task.isCompleted()) {
+                incompleteCount++;
+                totalPenaltyPoints += task.getPoints();
+            }
+        }
+        
+        if (incompleteCount > 0) {
+            String message = String.format("⚠️ %d incomplete task%s will result in -%d point%s penalty at day's end", 
+                incompleteCount, 
+                incompleteCount == 1 ? "" : "s",
+                totalPenaltyPoints,
+                totalPenaltyPoints == 1 ? "" : "s");
+            tvPenaltyMessage.setText(message);
+            cardPenaltyInfo.setVisibility(View.VISIBLE);
+        } else {
+            cardPenaltyInfo.setVisibility(View.GONE);
+        }
     }
 
     private void showAddTaskDialog() {
@@ -221,5 +281,37 @@ public class TasksFragment extends Fragment {
         if (databaseHelper != null) {
             loadData();
         }
+    }
+    
+    private void showPenaltyTestDialog() {
+        new android.app.AlertDialog.Builder(getContext())
+            .setTitle("🧪 Development Tools")
+            .setMessage("Choose a testing option:")
+            .setPositiveButton("Apply Penalties", (dialog, which) -> {
+                // Get yesterday's date
+                java.util.Calendar cal = java.util.Calendar.getInstance();
+                cal.add(java.util.Calendar.DAY_OF_MONTH, -1);
+                String yesterday = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(cal.getTime());
+                
+                // Apply penalties
+                databaseHelper.manualProcessEndOfDay(yesterday);
+                
+                // Show result
+                android.widget.Toast.makeText(getContext(), "Penalties applied for " + yesterday, android.widget.Toast.LENGTH_LONG).show();
+                
+                // Refresh data
+                loadData();
+                if (dataChangeListener != null) {
+                    dataChangeListener.onDataChanged();
+                }
+            })
+            .setNeutralButton("Reset Dialog Flag", (dialog, which) -> {
+                // Reset the penalty dialog flag to allow showing it again today
+                android.content.SharedPreferences prefs = getContext().getSharedPreferences("daily_dialogs", getContext().MODE_PRIVATE);
+                prefs.edit().remove("penalty_dialog_last_shown").apply();
+                android.widget.Toast.makeText(getContext(), "Penalty dialog flag reset - dialog will show on next app restart", android.widget.Toast.LENGTH_LONG).show();
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
     }
 }

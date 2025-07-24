@@ -79,7 +79,17 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
         public void bind(Task task) {
             tvTaskTitle.setText(task.getTitle());
             tvTaskDescription.setText(task.getDescription());
+            
+            // Simple points display
             tvTaskPoints.setText("+" + task.getPoints() + " points");
+            
+            // Set color based on completion status
+            if (task.isCompleted()) {
+                tvTaskPoints.setTextColor(itemView.getContext().getResources().getColor(R.color.success_color));
+            } else {
+                tvTaskPoints.setTextColor(itemView.getContext().getResources().getColor(R.color.text_secondary));
+            }
+            
             tvTaskCategory.setText(task.getCategory() != null ? task.getCategory() : "General");
             tvTaskPriority.setText(task.getPriorityText());
             checkboxCompleted.setChecked(task.isCompleted());
